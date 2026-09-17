@@ -1,196 +1,176 @@
-# Minishell
+# Minishell — Unix-like Shell Implementation in C
 
-A compact, Unix-like shell implementation written in C. This project recreates the core flow of an interactive terminal: reading user input, tokenizing commands, parsing operator precedence, executing commands with process isolation, and managing shell state such as environment variables and signals.
+A production-style command-line shell built in C to replicate the core behavior of a Unix terminal. This project demonstrates command parsing, process execution, redirection handling, environment management, and signal-aware interaction in a modular, low-level systems design.
 
-It is designed as a systems programming project focused on low-level process execution, file descriptor manipulation, and shell semantics rather than a full desktop application or network service.
-
----
-
-## 1. Project Overview
-
-This repository implements a simplified command-line shell that supports:
-
-- Interactive input handling through the readline library
-- Lexical tokenization of commands and operators
-- Parsing into an abstract syntax tree (AST)
-- Execution of external binaries and built-in commands
-- Pipelines and redirection operators
-- Environment variable management
-- Signal handling for interactive shell behavior
-- Exit status tracking for command execution
-
-The project follows the classic Unix shell model:
-
-1. Read a command from the user
-2. Tokenize it into a structured stream
-3. Build an execution tree
-4. Fork child processes when needed
-5. Redirect file descriptors
-6. Wait for completion and propagate exit status
-
-This is a strong systems-programming project demonstrating process control, C memory management, UNIX APIs, and shell parser/executor fundamentals.
-
-### Core features
-
-- Built-in commands: `echo`, `cd`, `pwd`, `export`, `unset`, `env`, `exit`
-- Operators: `|`, `&&`, `||`, `<`, `>`, `>>`, `<<`
-- Parent-shell state tracking with a custom environment map
-- AST-driven execution model instead of ad hoc command execution
-- Clean error handling for malformed input and redirection failures
+This project is built for technical hiring and portfolio review: it highlights the ability to work with POSIX APIs, process control, shell semantics, and reliable C code structure under real system constraints.
 
 ---
 
-## 2. Core Architecture & Technical Implementation
+## Project Overview
 
-### High-level execution flow
+Minishell is a simplified implementation of a Linux shell designed to handle interactive command execution with the same foundational behavior expected from a Unix shell. The application reads user input, tokenizes commands, parses operators and precedence, constructs an execution tree, and runs commands with proper file descriptor redirection and exit status management.
 
-The project is organized around a standard shell pipeline:
+### Key capabilities
 
-- `main.c` initializes the shell state and runs the main REPL loop
-- `input_handler.c` reads commands from the user
-- `tokenizer.c` converts raw input into `t_token` values
-- `parser_ast.c` and related parser files build a tree of commands and operators
-- `executor.c`, `executor_connector.c`, and `executor_redirection.c` execute the parsed AST
-- `built_in.c` and `environmentals_*` manage shell built-ins and environment variables
-- `signals.c` installs handlers for interactive signal behavior
+- Interactive terminal input using `readline`
+- Lexing and tokenization of shell syntax
+- Recursive-descent / stack-based AST parsing for command operators
+- Support for built-ins such as `echo`, `cd`, `pwd`, `export`, `unset`, `env`, and `exit`
+- Pipeline execution with `|`
+- Redirection support for `<`, `>`, `>>`, and `<<`
+- Logical operators `&&` and `||`
+- Custom environment variable map with hash-based storage
+- Signal handling for terminal interrupt behavior
+- Runtime status tracking for commands and shell state
 
-### Data and execution model
+### Why this project matters
 
-The shell state is represented by a `t_shell_data` structure in `minishell.h`, containing:
+This is a strong systems engineering project because it requires understanding of the operating system at a deep level:
 
-- the current prompt string
-- the token list for the current command
-- the parsed AST tree
-- the environment table
+- process creation and life cycles
+- file descriptor manipulation
+- shell parsing and execution semantics
+- memory ownership and cleanup in C
+- signal-driven interactive behavior
 
-This design keeps the shell state explicit and modular while allowing parsing and execution to operate on a structured command tree.
+It is particularly relevant for backend, systems, infrastructure, and low-level software roles.
 
-### Parsing and command representation
+---
 
-The parser uses a stack-based AST construction approach. Command nodes and operator nodes are represented in `parser.h` with a tagged union:
+## Architecture and Technical Implementation
 
-- `COMMAND` nodes hold argv-style arguments and type metadata
-- `OPERATOR` nodes hold the operation (`PIPE`, `AND`, `OR`, redirections, etc.) and left/right subtrees
+### 1. Shell execution model
 
-This allows nesting expressions like pipelines and redirections into a single executable tree, providing a clean execution model that mirrors shell syntax.
+The shell follows the standard Unix command execution flow:
 
-### Process execution
+1. Read input from the terminal
+2. Tokenize the command string
+3. Parse tokens into an AST
+4. Execute the tree according to operator precedence and semantics
+5. Manage process lifecycle and exit codes
 
-Execution is process-centric and uses the POSIX API heavily:
+The main loop is implemented in `main.c`, where the shell maintains runtime state and continuously accepts commands until the user exits.
 
-- `fork()` to create child processes
+### 2. Tokenization and parsing
+
+The tokenizer converts raw user input into structured tokens such as:
+
+- command words
+- operators (`|`, `||`, `&&`, `<`, `>`, `>>`, `<<`)
+- parentheses for grouped command flow
+
+The parser builds an AST in `parser_ast.c`, with node types for:
+
+- `COMMAND` nodes that carry argv-style arguments
+- `OPERATOR` nodes that represent expressions such as pipes and redirections
+
+This representation enables a clean and extensible execution pipeline rather than ad hoc command execution.
+
+### 3. Execution engine
+
+The executor layer is responsible for dispatching commands based on the parsed tree:
+
+- `executor.c` selects the correct execution path
+- `executor_command.c` handles command execution
+- `executor_connector.c` manages `|`, `&&`, and `||`
+- `executor_redirection.c` handles input/output file redirection and heredoc behavior
+
+The design uses the standard POSIX process model:
+
+- `fork()` for child processes
 - `pipe()` for inter-process communication
-- `dup2()` to remap stdin/stdout
-- `waitpid()` to synchronize child completion
-- `execve()`-style child execution semantics through shell command resolution
+- `dup2()` for stdin/stdout redirection
+- `waitpid()` to wait for process completion
 
-This design matches the behavior expected from a Unix shell: each stage of a pipeline can execute independently while preserving the intended command flow.
+This creates a real shell execution flow rather than a mock or simulated parser.
 
-### Redirection and file-descriptor handling
+### 4. Built-in commands and environment management
 
-The shell supports common redirections using file descriptors and `open()` calls:
+Built-ins are implemented in `built_in.c` and the environment is managed by a custom hash-map implementation in the `environmentals_*` files.
 
-- input redirection with `<`
-- output redirection with `>`
-- append mode with `>>`
-- heredoc-style input with `<<`
+Supported built-ins include:
 
-The executor preserves original standard file descriptors with `dup()`, applies redirections, runs the command, and restores the terminal state afterward. This ensures the shell remains stable across command execution.
+- `echo`
+- `cd`
+- `pwd`
+- `export`
+- `unset`
+- `env`
+- `exit`
 
-### Environment management
+The environment model stores shell variables and status information while preserving command exit state between iterations.
 
-Environment variables are stored in a custom hash map implementation (`environmentals.h`, `environmentals_helpers.c`, `environmentals_operators_*.c`). The shell tracks key/value pairs in a bucketed structure, exposes lookup and mutation functions, and stores shell status information like the last exit code.
+### 5. Signal handling
 
-### Signal handling
+Signal handling is implemented in `signals.c` and `signal_handler.h` to maintain interactive shell behavior when the user sends interrupts. The shell suppresses or handles signals appropriately during pipeline execution, ensuring it behaves like a real terminal application.
 
-The shell registers signal handlers for interactive control flow using `sigaction()` and `signal()`. The code handles the terminal interrupt semantics for patterns such as Ctrl+C and child-process propagation in pipelines.
+### 6. I/O and runtime characteristics
 
-### I/O and runtime model
+This project does not use sockets, Docker orchestration, or event-loop networking. It is a local CLI application built on Unix process and file-descriptor primitives. The runtime is synchronous and blocking by design, which is appropriate for a shell implementation and consistent with Unix shell semantics.
 
-This project is not a networked service and does not use sockets or Docker orchestration. The runtime model is a local CLI shell built on POSIX process control, file-descriptor redirection, and blocking terminal I/O. In other words, it is a process-driven, single-host command interpreter rather than a non-blocking server, socket-based daemon, or container runtime.
+In practical terms, the project demonstrates:
 
-The execution model is intentionally synchronous and process-oriented:
-
-- commands are read from a terminal
-- execution waits for child completion before continuing
-- pipelines and redirections are represented as OS-level data flow rather than callback-based event loops
-
-This is a traditional Unix shell architecture, which is appropriate for systems-level learning and interview-ready demonstration.
+- C system programming skills
+- command-line application architecture
+- POSIX process coordination
+- low-level resource management
+- correct error handling under terminal and process conditions
 
 ---
 
-## 3. Prerequisites & Build Instructions
+## Prerequisites
 
-### Prerequisites
-
-The project is intended for a Linux environment and requires:
+This project targets a Linux environment and requires:
 
 - GCC or Clang
 - GNU Make
 - `readline` development library
-- Standard POSIX build tools
+- Standard Unix tooling
 
-On Debian/Ubuntu-based systems:
+Install dependencies on Debian/Ubuntu:
 
 ```bash
 sudo apt-get update
 sudo apt-get install -y build-essential libreadline-dev
 ```
 
-On macOS with Homebrew:
+On macOS (Homebrew):
 
 ```bash
 brew install readline
 ```
 
-### Build with the provided Makefile
+---
 
-The repository includes a Makefile that builds the shell binary:
+## Build Instructions
+
+The project includes a Makefile for building the shell:
 
 ```bash
 make
 ```
 
-This compiles the project with warnings enabled and also includes AddressSanitizer instrumentation for debugging:
-
-```bash
-CC = cc
-FLAGS = -Wall -Wextra -Werror
-SAN = -fsanitize=address -g
-LFLAGS = -lreadline
-```
-
-To remove object files:
-
-```bash
-make clean
-```
-
-To remove the built binary and objects:
-
-```bash
-make fclean
-```
-
-To rebuild from a clean state:
-
-```bash
-make re
-```
-
-### Run the shell
+Run the resulting binary:
 
 ```bash
 ./minishell
 ```
 
+Useful maintenance commands:
+
+```bash
+make clean
+make fclean
+make re
+```
+
+The Makefile compiles with strict warning settings and includes AddressSanitizer support for debugging and validation.
+
 ---
 
-## 4. Usage Examples
+## Usage Examples
 
-Once the shell is running, you can use commands similar to a regular Unix shell:
-
-### Basic execution
+### Basic commands
 
 ```bash
 echo hello
@@ -198,16 +178,15 @@ pwd
 ls -l
 ```
 
-### Environment and shell state
+### Environment variables
 
 ```bash
 export USER=student
 env
 unset USER
-echo $USER
 ```
 
-### Pipelines
+### Pipes
 
 ```bash
 ls -l | grep src
@@ -221,7 +200,7 @@ cat < input.txt > output.txt
 printf "hello\n" >> log.txt
 ```
 
-### Heredoc input
+### Heredoc
 
 ```bash
 cat << EOF
@@ -236,11 +215,11 @@ false && echo "won't run"
 true || echo "this will run"
 ```
 
-### Built-in shell commands
+### Built-ins
 
 ```bash
-pwd
 cd /tmp
+pwd
 echo hello
 exit
 ```
@@ -284,13 +263,25 @@ exit
 ├── signal_handler.h
 ├── README.md
 ├── Makefile
+├── script.sh
 └── minishell_debug/
 ```
 
 ---
 
-## Notes
+## Skills Demonstrated
 
-This implementation is intentionally focused on the core mechanics of a shell and is best viewed as a professional systems-programming exercise. It demonstrates solid C engineering principles, robust memory handling, process orchestration, and shell behavior modeling without depending on external frameworks or container infrastructure.
+- C programming and memory management
+- Unix/Linux system programming
+- Process control and inter-process communication
+- Shell parsing and execution semantics
+- Redirection and file-descriptor handling
+- API design and modular software architecture
+- Defensive programming and error handling
+- Signal-aware application behavior
 
-Designed to be clean, modular, and interview-friendly, the project is suitable for showcasing low-level Unix systems expertise and command-line application architecture.
+---
+
+## Summary for Recruiters
+
+This project showcases the ability to build a real-world, low-level system application in C, with strong emphasis on process orchestration, shell behavior, and operating system interfaces. It is a strong candidate project for roles involving backend systems, infrastructure engineering, low-level software, CLI tooling, and Unix/Linux development.
